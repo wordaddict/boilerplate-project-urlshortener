@@ -1,15 +1,24 @@
-'use strict';
+// 'use strict';
 
-var express = require('express');
-var mongo = require('mongodb');
-var mongoose = require('mongoose');
-var bodyParser = require('body-parser');
-var dns = require('dns');
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').load();
+}
 
-var cors = require('cors');
+// require modules
+const express = require('express');
+const mongo = require('mongodb');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const dns = require('dns');
+const btoa = require('btoa');
+const atob = require('atob');
+const cors = require('cors');
+
+// require other files
+const URL = require('./models/urlModel');
 
 var app = express();
-
+ 
 app.use(bodyParser.urlencoded({ extended: false }))
  
 // parse application/json
@@ -60,10 +69,46 @@ app.post("/api/shorturl/new", (req, res) => {
         "error": "invalid URL"
       })
     }
-    console.log('family', family);
-    console.log('err', err);
-    res.send('Data collected!');
+    URL.findOne({url: splitUrl}, (err, doc) => {
+      if (doc) {
+        console.log('entry found in the db', doc);
+        res.send({
+          url: realUrl,
+          hash: btoa(doc._id),
+          status: 200,
+          statusTxt: 'OK'
+        });
+      } else {
+        console.log('entry not found in the DB', doc);
+        const url = new URL({
+          url: realUrl,
+          _id: 2
+        });
+        url.save((err) => {
+          if(err) {
+            return console.error(err);
+          }
+          return res.send({
+            "original_url": realUrl,
+            "short_url": btoa(url._id)
+          })
+        })
+      }
+    })
   })
+});
+
+
+app.get('/:hash', (req, res) => {
+  var baseid = req.params.hash;
+  var id = atob(baseid);
+  URL.findOne({ _id: id }, (err, doc) => {
+      if(doc) {
+          res.redirect(doc.url);
+      } else {
+          res.redirect('/');
+      }
+  });
 });
 
 
